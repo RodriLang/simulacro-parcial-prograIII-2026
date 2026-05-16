@@ -9,7 +9,6 @@ import com.utn.simulacro.mappers.ReservationMapper;
 import com.utn.simulacro.models.Game;
 import com.utn.simulacro.models.Member;
 import com.utn.simulacro.models.Reservation;
-import com.utn.simulacro.repositories.GameRepository;
 import com.utn.simulacro.repositories.ReservationRepository;
 import com.utn.simulacro.services.GameService;
 import com.utn.simulacro.services.MemberService;
@@ -26,7 +25,6 @@ import java.util.List;
 public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
-    private final GameRepository gameRepository;
     private final ReservationMapper reservationMapper;
     private final GameService gameService;
     private final MemberService memberService;
@@ -44,13 +42,6 @@ public class ReservationServiceImpl implements ReservationService {
         newReservation.setGame(game);
 
         int newStock = game.getAvailableStock() - request.getQuantity();
-
-        // Actualizar el stock e inyectar repository para guardar el cambio
-        game.setAvailableStock(newStock);
-        gameRepository.save(game);
-
-        // Otra forma
-        // Crear un metodo en GameService para actualizar el stock
         gameService.updateStock(game.getId(), newStock);
 
         Reservation savedReservation = reservationRepository.save(newReservation);
@@ -84,12 +75,6 @@ public class ReservationServiceImpl implements ReservationService {
                 .map(reservationMapper::toDto)
                 .toList();
 
-        // Otra forma de hacerlo mas eficiente pero con menos informacion descriptiva del error
-        /*
-        return reservationRepository.findByMember_Id(memberId).stream()
-                .map(reservationMapper::toDto)
-                .toList();
-        */
     }
 
     @Override
@@ -106,8 +91,8 @@ public class ReservationServiceImpl implements ReservationService {
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservation.setCancellationDate(request.getCancellationDate());
 
-        // para persistir la modificacion del stock inyectamos gameRepository
-        gameRepository.save(game);
+        int newStock = game.getAvailableStock() - reservation.getQuantity();
+        gameService.updateStock(game.getId(), newStock);
 
         Reservation savedReservation = reservationRepository.save(reservation);
 
@@ -127,11 +112,11 @@ public class ReservationServiceImpl implements ReservationService {
 
     private void validateReservation(ReservationRequestDto request, Member member, Game game) {
 
-        if (!member.getActive()) {
+        if (Boolean.FALSE.equals(member.getActive())) {
             throw new InactiveMemberException("El socio se encuentra inactivo");
         }
 
-        if (!game.getActive()) {
+        if (Boolean.FALSE.equals(game.getActive())) {
             throw new InactiveGameException("El juego no se encuentra disponible");
         }
 
